@@ -70,12 +70,16 @@ public class StormOnYarn {
     private Map _stormConf;
     private MasterClient _client = null;
 
+    // 构造函数，传入参数列表
+    // private型
     private StormOnYarn(@SuppressWarnings("rawtypes") Map stormConf) {
         this(null, stormConf);
     }
 
-    private StormOnYarn(ApplicationId appId, @SuppressWarnings("rawtypes") Map stormConf) {        
-        _hadoopConf = new YarnConfiguration();  
+    // 根据传入参数，赋值，初始化，启动yarn
+    // 也是private型
+    private StormOnYarn(ApplicationId appId, @SuppressWarnings("rawtypes") Map stormConf) {
+        _hadoopConf = new YarnConfiguration();
         _yarn = YarnClient.createYarnClient();
         _stormConf = stormConf;
         _appId = appId;
@@ -84,30 +88,34 @@ public class StormOnYarn {
     }
 
     public void stop() {
+        // 如果客户端没有关闭，先关客户端再停止yarn
         if(_client != null) {
             _client.close();
         }
         _yarn.stop();
     }
 
+    // 返回App的ID
     public ApplicationId getAppId() {
         //TODO make this immutable
         return _appId;
     }
 
+    // 获取客户端
     @SuppressWarnings("unchecked")
+    // synchronized 同步
     public synchronized StormMaster.Client getClient() throws YarnException, IOException {
         if (_client == null) {
             String host = null;
             int port = 0;
             //wait for application to be ready
             int max_wait_for_report = Utils.getInt(_stormConf.get(Config.YARN_REPORT_WAIT_MILLIS));
-            int waited=0; 
+            int waited=0;
             while (waited<max_wait_for_report) {
                 ApplicationReport report = _yarn.getApplicationReport(_appId);
                 host = report.getHost();
                 port = report.getRpcPort();
-                if (host == null || port==0) { 
+                if (host == null || port==0) {
                     try {
                         Thread.sleep(1000);
                     } catch (InterruptedException e) {
@@ -121,7 +129,7 @@ public class StormOnYarn {
                 LOG.info("No host/port returned for Application Master " + _appId);
                 return null;
             }
-            
+
             LOG.info("application report for "+_appId+" :"+host+":"+port);
             if (_stormConf == null ) {
                 _stormConf = new HashMap<Object,Object>();
@@ -134,6 +142,7 @@ public class StormOnYarn {
         return _client.getClient();
     }
 
+    // 启动App
     private void launchApp(String appName, String queue, int amMB, String storm_zip_location) throws Exception {
         LOG.debug("StormOnYarn:launchApp() ...");
         YarnClientApplication client_app = _yarn.createApplication();
@@ -145,7 +154,7 @@ public class StormOnYarn {
             //TODO need some sanity checks
             amMB = app.getMaximumResourceCapability().getMemory();
         }
-        ApplicationSubmissionContext appContext = 
+        ApplicationSubmissionContext appContext =
                 Records.newRecord(ApplicationSubmissionContext.class);
         appContext.setApplicationId(app.getApplicationId());
         appContext.setApplicationName(appName);
@@ -167,7 +176,7 @@ public class StormOnYarn {
         FileSystem fs = FileSystem.get(_hadoopConf);
         Path src = new Path(appMasterJar);
         String appHome =  Util.getApplicationHomeForId(_appId.toString());
-        Path dst = new Path(fs.getHomeDirectory(), 
+        Path dst = new Path(fs.getHomeDirectory(),
                 appHome + Path.SEPARATOR + "AppMaster.jar");
         fs.copyFromLocalFile(false, true, src, dst);
         localResources.put("AppMaster.jar", Util.newYarnAppResource(fs, dst));
@@ -177,7 +186,7 @@ public class StormOnYarn {
         if (storm_zip_location != null) {
             zip = new Path(storm_zip_location);
         } else {
-            zip = new Path("/lib/storm/"+stormVersion+"/storm.zip");         
+            zip = new Path("/lib/storm/"+stormVersion+"/storm.zip");
         }
         _stormConf.put("storm.zip.path", zip.makeQualified(fs).toUri().getPath());
         LocalResourceVisibility visibility = LocalResourceVisibility.PUBLIC;
@@ -187,12 +196,13 @@ public class StormOnYarn {
           _stormConf.put("storm.zip.visibility", "APPLICATION");
         }
         localResources.put("storm", Util.newYarnAppResource(fs, zip, LocalResourceType.ARCHIVE, visibility));
-        
+
         Path confDst = Util.createConfigurationFileInFs(fs, appHome, _stormConf, _hadoopConf);
         // establish a symbolic link to conf directory
         localResources.put("conf", Util.newYarnAppResource(fs, confDst));
 
         // Setup security tokens
+        // 设置安全口令
         Path[] paths = new Path[3];
         paths[0] = dst;
         paths[1] = zip;
@@ -229,8 +239,8 @@ public class StormOnYarn {
         String yarn_class_path = (String) _stormConf.get("storm.yarn.yarn_classpath");
         if (yarn_class_path == null){
             StringBuilder yarn_class_path_builder = new StringBuilder();
-            while ((line = reader.readLine() ) != null){            
-                yarn_class_path_builder.append(line);             
+            while ((line = reader.readLine() ) != null){
+                yarn_class_path_builder.append(line);
             }
             yarn_class_path = yarn_class_path_builder.toString();
         }
@@ -238,7 +248,7 @@ public class StormOnYarn {
         proc.waitFor();
         reader.close();
         Apps.addToEnvironment(env, Environment.CLASSPATH.name(), yarn_class_path);
-        
+
         String stormHomeInZip = Util.getStormHomeInZip(fs, zip, stormVersion.version());
         Apps.addToEnvironment(env, Environment.CLASSPATH.name(), "./storm/" + stormHomeInZip + "/*");
         Apps.addToEnvironment(env, Environment.CLASSPATH.name(), "./storm/" + stormHomeInZip + "/lib/*");
@@ -246,11 +256,11 @@ public class StormOnYarn {
         String java_home = (String) _stormConf.get("storm.yarn.java_home");
         if (java_home == null)
             java_home = System.getenv("JAVA_HOME");
-        
+
         if (java_home != null && !java_home.isEmpty())
           env.put("JAVA_HOME", java_home);
         LOG.info("Using JAVA_HOME = [" + env.get("JAVA_HOME") + "]");
-        
+
         env.put("appJar", appMasterJar);
         env.put("appName", appName);
         env.put("appId", new Integer(_appId.getId()).toString());
@@ -258,6 +268,7 @@ public class StormOnYarn {
         amContainer.setEnvironment(env);
 
         // Set the necessary command to execute the application master
+        // 设置启动AM必须的命令
         Vector<String> vargs = new Vector<String>();
         if (java_home != null && !java_home.isEmpty())
           vargs.add(env.get("JAVA_HOME") + "/bin/java");
@@ -276,6 +287,7 @@ public class StormOnYarn {
 
         // Set up resource type requirements
         // For now, only memory is supported so we set memory requirements
+        // 目前只有内存能够被支持分配
         Resource capability = Records.newRecord(Resource.class);
         capability.setMemory(amMB);
         appContext.setResource(capability);
@@ -293,49 +305,56 @@ public class StormOnYarn {
         while (true) {
 
             // Check app status every 1 second.
+            // 每隔1秒查看App状态
             try {
                 Thread.sleep(1000);
             } catch (InterruptedException e) {
                 LOG.debug("Thread sleep in monitoring loop interrupted");
             }
 
-            // Get application report for the appId we are interested in 
+            // Get application report for the appId we are interested in
+            // 根据我们想要了解的appID，返回该App的报告日志
             ApplicationReport report = _yarn.getApplicationReport(_appId);
             YarnApplicationState state = report.getYarnApplicationState();
             FinalApplicationStatus dsStatus = report.getFinalApplicationStatus();
+            // 完成
             if (YarnApplicationState.FINISHED == state) {
+                // 成功完成
                 if (FinalApplicationStatus.SUCCEEDED == dsStatus) {
                     LOG.info("Application has completed successfully. Breaking monitoring loop");
-                    return true;        
+                    return true;
                 }
+                // 失败完成
                 else {
                     LOG.info("Application did finished unsuccessfully."
                             + " YarnState=" + state.toString() + ", DSFinalStatus=" + dsStatus.toString()
                             + ". Breaking monitoring loop");
                     return false;
-                }             
+                }
             }
-            else if (YarnApplicationState.KILLED == state   
+            // 被kill或者失败
+            else if (YarnApplicationState.KILLED == state
                     || YarnApplicationState.FAILED == state) {
                 LOG.info("Application did not finish."
                         + " YarnState=" + state.toString() + ", DSFinalStatus=" + dsStatus.toString()
                         + ". Breaking monitoring loop");
                 return false;
-            }           
+            }
 
             //announce application master's host and port
+            // 正在运行
             if (state==YarnApplicationState.RUNNING) {
                 return true;
             }
-        }    
+        }
     }
 
 
-    /** 
+    /**
      * Find a jar that contains a class of the same name, if any.
      * It will return a jar file, even if that is not the first thing
      * on the class path that has a class with the same name.
-     * 
+     *
      * @param my_class the class to find.
      * @return a jar file that contains the class, or null.
      * @throws IOException on any error
@@ -362,11 +381,12 @@ public class StormOnYarn {
                 return toReturn.replaceAll("!.*$", "");
             }
         }
-                
+
         throw new IOException("Fail to locat a JAR for class: "+my_class.getName());
     }
 
-    public static StormOnYarn launchApplication(String appName, String queue, 
+    // 可供调用的两个构造函数
+    public static StormOnYarn launchApplication(String appName, String queue,
             int amMB, @SuppressWarnings("rawtypes") Map stormConf, String storm_zip_location) throws Exception {
         StormOnYarn storm = new StormOnYarn(stormConf);
         storm.launchApp(appName, queue, amMB, storm_zip_location);

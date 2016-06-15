@@ -13,16 +13,17 @@
  */
 package com.yahoo.storm.yarn;
 
+// 版本信息
 public class Version {
-  
+
   private final String version;
   private final String build;
-  
+
   public Version(String version, String build) {
     this.version = version;
     this.build = build;
   }
-  
+
   public String version() {
     return this.version;
   }
@@ -30,7 +31,7 @@ public class Version {
   public String build() {
     return this.build;
   }
-  
+
   @Override
   public String toString() {
     if (null == build || build.isEmpty()) {

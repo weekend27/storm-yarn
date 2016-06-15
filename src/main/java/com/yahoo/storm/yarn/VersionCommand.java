@@ -3,7 +3,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,26 +29,28 @@ import com.yahoo.storm.yarn.Client.ClientCommand;
 import com.yahoo.storm.yarn.generated.StormMaster;
 
 class VersionCommand implements ClientCommand {
-  private static final Logger LOG = LoggerFactory
-      .getLogger(StormMasterCommand.class);
-  
-  VersionCommand() {
-  }
+    // 日志
+    private static final Logger LOG = LoggerFactory
+            .getLogger(StormMasterCommand.class);
 
-  @Override
-  public Options getOpts() {
-    Options opts = new Options();
-    return opts;
-  }
-  
-  @Override
-  public String getHeaderDescription() {
-    return "storm-yarn version";
-  }
+    // 空的构造器
+    VersionCommand() {
+    }
 
-  @Override
-  public void process(CommandLine cl) throws Exception {
-    Version version = Util.getStormVersion();
-    System.out.println(version.toString());
-  }
+    @Override
+    public Options getOpts() {
+        Options opts = new Options();
+        return opts;
+    }
+
+    @Override
+    public String getHeaderDescription() {
+        return "storm-yarn version";
+    }
+
+    @Override
+    public void process(CommandLine cl) throws Exception {
+        Version version = Util.getStormVersion();
+        System.out.println(version.toString());
+    }
 }
